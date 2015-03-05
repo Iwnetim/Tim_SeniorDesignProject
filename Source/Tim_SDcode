@@ -1,0 +1,122 @@
+from numpy import arange, pi,array, zeros
+from pylab import plot, savefig, legend
+import numpy as np
+#from astropy.constants import e,eps0,h,m_e
+from astropy import units as u
+from scipy import sparse
+
+
+import matplotlib
+import matplotlib.pyplot as plt
+
+#Constants (SI units)
+q=1.6022e-19 * u.C # charge of electron 
+k_b=1.3806503e-23 * (u.J/u.K) #Boltzman constant
+eps_0=8.854187817e-12 * (u.F/u.m)#permitvity constant for free space 
+T= 298.0 * u.K #room temprature 
+
+#GaAs is the materials to be used for this study and below are the values for different variables 
+eps_GaAs=12.93 #dielectric constant (static not at high frequency)
+epsGS = eps_GaAs*eps_0
+mu_p=0.045*(u.m*u.m/(u.V*u.second)) # moblity of electrons
+mu_n=0.14*(u.m*u.m/(u.V*u.second)) #moblity of holes
+D_n = mu_n * k_b * T/q
+D_p = mu_p * k_b * T/q
+D_p_1=0.0220*(u.m*u.m/u.s) # Diffussion coffienct  for electrons
+D_n_1=0.001*(u.m*u.m/u.s) # Diffussion cofficient for holes 
+N_A=5e+23 #Charge density for holes 
+N_D=2e+24 #Charge density for holes
+
+ni= 2.1*(u.m**3)
+Vt= k_b*T/q # Thermal Voltage to be used for potential normilzation 
+ENc=4.37 * 1017
+LD=sqrt(epsGS*k_b*T/((q**2)*N_D)) #Debye Length to be used for mesh normilazation
+C=5 # change this value for charge density of donors and acceptors  
+
+
+# If N_A > N_D then P= -N_D+N_A. That is the semiconducotr material is p-type and p=ni^2/n
+# If N_A < N_D then n= N_D-N_A. That is the semiconducotr material is n-type and  n=ni^2/p
+# If undoped n=p=ni, where ni is the electron and hole concentration when undoped
+
+#system size and division scale 
+L=2.0 #*u.m
+N=21
+h=L/(N-1)
+h2=h*h
+
+
+#Finding the solution
+bt=np.zeros(N)
+alpha=np.zeros(N)
+a=np.zeros(N)
+b=np.zeros(N)
+c=np.zeros(N)
+V=np.zeros(N)
+Vo=np.copy(V)
+a[0] = 1/h2
+c[0] = 1/h2
+b[0] = 1
+V[0] = Vo[0]
+a[N-1] = 0
+c[N-1] = 0
+b[N-1] = 1
+V[N-1] = Vo[N-1]
+
+Tol=1e-5
+
+for i in range (1,N-1):
+    a[i]=1/h2
+    b[i]=-((2/h2)+(exp(Vo[i])+exp(-Vo[i])))
+    c[i]=1/h2
+    V[i]=-exp(Vo[i])+exp(-Vo[i])+ C/ni-(exp(Vo[i])-exp(-Vo[i]))*Vo[i] 
+
+#LU decompostion and iteration for possion
+#step 1, page 31,manuel-equality of L and U
+taw=2   
+j=0
+while taw >1:
+    
+    alpha[0]=a[0]
+    bt[0]=0
+    
+    for k in range (1,N):
+        bt[k]=b[k]/alpha[k-1]
+        alpha[k]=a[k]-bt[k]*c[k-1]
+    
+
+
+    diagonals=[np.ones(N),bt[1:]]
+    L=sparse.diags(diagonals,[0,-1])
+    
+    print L
+
+              
+#step 2.1,page 31,solving for Lg=V
+    g=np.zeros(N)
+    g[0]=V[0]
+    for k in range (1,N):
+        g[k]=V[k]-bt[k]*g[k-1]
+    diagonalsg=[np.ones(N),Vo[1:]]
+    Lg=sparse.diags(diagonalsg,[0,-1])
+    print Lg.toarray()    
+        
+    
+    
+
+#step 2.2,page 31,solving for U*Vo=g; from n-1,n-2...2,1
+    Vo=np.zeros(N)
+    
+    Vo[N-1]=g[N-1]/alpha[N-1]
+    for i in range (N-1,1):
+        Vo[i]=(g[i]-c[i]*Vo[i+1])/alpha[i]
+    diagonals1=[np.ones(N),Vo[1:]]
+    L=sparse.diags(diagonals1,[0,-1])
+    '''
+    print L.toarray() 
+    print diagonals1
+    '''
+    taw=0
+    
+        
+        
+   
