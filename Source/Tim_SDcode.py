@@ -82,7 +82,6 @@ Vo=np.zeros(N)
 n=np.zeros(N)
 p=np.zeros(N)
 
-print N_A
 n[0]=(ni**2)/(N_A*u.m**-3)
 p[0]=N_A*u.m**3
 p[N-1]=(ni**2)/(N_D*u.m**-3)
@@ -98,7 +97,7 @@ a=np.zeros(N)
 b=np.zeros(N)
 c=np.zeros(N)
 f=np.zeros(N)
-Vo=np.copy(f)
+
 a[0] = 1/h2
 c[0] = 1/h2
 b[0] = 1
@@ -110,17 +109,27 @@ f[N-1] = Vo[N-1]
 
 Tol=1e-5
 
-for i in range (1,N-1):
-    a[i]=1/h2
-    b[i]=-((2/h2)+(exp(Vo[i])+exp(-Vo[i])))
-    c[i]=1/h2
-    f[i]=-exp(Vo[i])+exp(-Vo[i]) -((exp(Vo[i])-exp(-Vo[i]))*Vo[i])+ (C[i]*(u.m**-3))/ni
-    
-    
+
+a=a+1/h2
+b=-2/h2+(np.exp(Vo)+np.exp(-Vo))
+c=c+1/h2
+f=-np.exp(Vo)+np.exp(-Vo)-(np.exp(Vo)-np.exp(-Vo))*Vo + C*(u.m**-3)/ni
+print "a"
+print a
+print "b"
+print b
+print "c"
+print c
+print "f"
+print f
+ 
+  
 #LU decompostion and iteration for possion
 #step 1, page 31,manuel-equality of L and U
+
 taw=0  
 while not taw==1:
+    
 
     alpha[0]=a[0]
     bt[0]=0
@@ -128,36 +137,38 @@ while not taw==1:
     for k in range (1,N):
         bt[k]=b[k]/alpha[k-1]
         alpha[k]=a[k]-bt[k]*c[k-1]
+  
     
-
-
     diagonals=[np.ones(N),bt[1:]]
     L=sparse.diags(diagonals,[0,-1])
-    
-
               
 #step 2.1,page 31,solving for Lg=f
     g=np.zeros(N)
     g[0]=f[0]
     for k in range (1,N):
-        g[k]=f[k]-bt[k]*g[k-1]
+        g[k]=f[k]-bt[k]*g[k-1] 
     diagonalsg=[np.ones(N),Vo[1:]]
     Lg=sparse.diags(diagonalsg,[0,-1])
+    print g
     
-     
-    print Lg.toarray()    
-        
-
+    
+          
 #step 2.2,page 31,solving for U*Vo=g; from n-1,n-2...2,1
     
     delta=np.zeros(N)
     
-    las=g[N-1]/alpha[N-1]
-    delta[N-1] = las- Vo[N-1] # differnce between
-    for i in range (N-1,-1,1):
-        las=(g[i]-c[i]*Vo[i+1])/alpha[i]
-        delta[i]=las-Vo[i]
-           
+    last=Vo[N-1]
+    Vo[N-1]=g[N-1]/alpha[N-1]
+    delta[N-1] = last- Vo[N-1] # differnce between
+       
+   
+    for i in range (N-2,1,1):
+        last=(g[i]-c[i]*Vo[i+1])/alpha[i]
+        delta[i]=last-Vo[i]
+        Vo[i]=las
+   
+    print delta
+    
     diagonals1=[np.ones(N),Vo[1:]]
     L=sparse.diags(diagonals1,[0,-1])
     
@@ -167,17 +178,23 @@ while not taw==1:
     #Finding the maximum delta 
     delta_max = 0
     
-    for i in range (1,N):
-        lim= abs(delta[i])
-        if(lim > delta_max):
-            delta_max=lim    
-            
+    delta_max = np.abs(delta).max()
+       
+    
+    print delta_max
+          
     if delta_max < Tol:
         taw = 1
+    else:
+        for i in range (1,N-1):
+            a[i]=1/h2
+            b[i]=-((2/h2)+(exp(Vo[i])+exp(-Vo[i])))
+            c[i]=1/h2
+            f[i]=-exp(Vo[i])+exp(-Vo[i]) -((exp(Vo[i])-exp(-Vo[i]))*Vo[i])+ (C[i]*(u.m**-3))/ni
+
+    
+             
 print Vo    
-
-
-
 
 
 
