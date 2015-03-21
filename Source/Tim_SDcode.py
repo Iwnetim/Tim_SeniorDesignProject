@@ -32,7 +32,7 @@ ni= 2.1*(u.m**-3)
 Vt= k_b*T/q # Thermal Voltage to be used for potential normilzation 
 ENc=4.37 * 1017
 
-C=15e+24 # change this value for charge density of donors and acceptors  
+#C=15e+24*(u.m**-3) # change this value for charge density of donors and acceptors  
 
 
 # If N_A > N_D then P= -N_D+N_A. That is the semiconducotr material is p-type and p=ni^2/n
@@ -43,7 +43,7 @@ C=15e+24 # change this value for charge density of donors and acceptors
 #scaling parameters 
 #From "Deplation width(2)"
  
-Vbi = k_b*T*log((N_A*N_D)/(ni*ni))                              # The difference between fermi levels(Efno-Efpo) 
+Vbi = k_b*T*log((N_A*N_D)/(ni*ni))                              # Barrier potential, an intially established potential difference due to the electric field formed 
 xno=(sqrt(2*epsGS*N_A*Vbi*u.m**-2/((q*q)*N_D*(N_A+N_D))))*u.m   #deplation widith for n in cm
 xpo=(sqrt(2*epsGS*N_D*Vbi*u.m**-2/((q*q)*N_A*(N_A+N_D))))*u.m   #deplation widith for p in cm
 W=sqrt(2*epsGS*Vbi*(N_A+N_D)*u.m**-2/((q*q)*N_D*N_A))*u.m       # W=xno+xpo  in cm
@@ -62,27 +62,33 @@ x=xpo+xno
 #Using Ldi to scale the grid
 N= 20
  
-dx = W/N;
+dx = x/N;
 dx=dx/Ldi    #Since meshe length is limited by Debye length; it should be normalized 
-print dx
+
 
 h=dx
 h2=dx*dx 
+C=np.zeros(N)
 
-print h2
+for i in range (1,N):
+    if i<= 10:
+        C[i] = - N_A/ni
+    elif i>10: 
+        C[i] = N_D/ni;
+    
+
 
 Vo=np.zeros(N)
-for i in range (1,N):
-    if 0.5*C > 0:
-        bc = 0.5*C*(1 + sqrt(1+4/(C*C)))
-        Vo[i] = log(bc)
-    elif 0.5*C < 0:
-        bc= 0.5*C*(1-sqrt(1+4/(C*C)))
-        Vo[i] = log(bc)
+n=np.zeros(N)
+p=np.zeros(N)
 
-
-
-
+print N_A
+n[0]=(ni**2)/(N_A*u.m**-3)
+p[0]=N_A*u.m**3
+p[N-1]=(ni**2)/(N_D*u.m**-3)
+n[N-1]=N_D*u.m**3
+Vo[0]=0
+Vo[N-1]=Vbi*u.m**-1*u.N**-1
 
 
 #Finding the solution
@@ -91,16 +97,16 @@ alpha=np.zeros(N)
 a=np.zeros(N)
 b=np.zeros(N)
 c=np.zeros(N)
-V=np.zeros(N)
-Vo=np.copy(V)
+f=np.zeros(N)
+Vo=np.copy(f)
 a[0] = 1/h2
 c[0] = 1/h2
 b[0] = 1
-V[0] = Vo[0]
+f[0] = Vo[0]
 a[N-1] = 0
 c[N-1] = 0
 b[N-1] = 1
-V[N-1] = Vo[N-1]
+f[N-1] = Vo[N-1]
 
 Tol=1e-5
 
@@ -108,14 +114,14 @@ for i in range (1,N-1):
     a[i]=1/h2
     b[i]=-((2/h2)+(exp(Vo[i])+exp(-Vo[i])))
     c[i]=1/h2
-    V[i]=-exp(Vo[i])+exp(-Vo[i]) -((exp(Vo[i])-exp(-Vo[i]))*Vo[i])+ C/(ni*u.m**3) 
-
+    f[i]=-exp(Vo[i])+exp(-Vo[i]) -((exp(Vo[i])-exp(-Vo[i]))*Vo[i])+ (C[i]*(u.m**-3))/ni
+    
+    
 #LU decompostion and iteration for possion
 #step 1, page 31,manuel-equality of L and U
-taw=2   
-j=0
-while taw >1:
-    
+taw=0  
+while not taw==1:
+
     alpha[0]=a[0]
     bt[0]=0
     
@@ -128,36 +134,57 @@ while taw >1:
     diagonals=[np.ones(N),bt[1:]]
     L=sparse.diags(diagonals,[0,-1])
     
-    print L
 
               
-#step 2.1,page 31,solving for Lg=V
+#step 2.1,page 31,solving for Lg=f
     g=np.zeros(N)
-    g[0]=V[0]
+    g[0]=f[0]
     for k in range (1,N):
-        g[k]=V[k]-bt[k]*g[k-1]
+        g[k]=f[k]-bt[k]*g[k-1]
     diagonalsg=[np.ones(N),Vo[1:]]
     Lg=sparse.diags(diagonalsg,[0,-1])
+    
+     
     print Lg.toarray()    
         
-    
-    
 
 #step 2.2,page 31,solving for U*Vo=g; from n-1,n-2...2,1
-    Vo=np.zeros(N)
     
-    Vo[N-1]=g[N-1]/alpha[N-1]
-    for i in range (N-1,1):
-        Vo[i]=(g[i]-c[i]*Vo[i+1])/alpha[i]
+    delta=np.zeros(N)
+    
+    las=g[N-1]/alpha[N-1]
+    delta[N-1] = las- Vo[N-1] # differnce between
+    for i in range (N-1,-1,1):
+        las=(g[i]-c[i]*Vo[i+1])/alpha[i]
+        delta[i]=las-Vo[i]
+           
     diagonals1=[np.ones(N),Vo[1:]]
     L=sparse.diags(diagonals1,[0,-1])
     
     print L.toarray() 
     print diagonals1
     
-    taw=0
-   
-  
+    #Finding the maximum delta 
+    delta_max = 0
+    
+    for i in range (1,N):
+        lim= abs(delta[i])
+        if(lim > delta_max):
+            delta_max=lim    
+            
+    if delta_max < Tol:
+        taw = 1
+print Vo    
+
+
+
+
+
+
+    
+    
+
+
         
         
    
