@@ -28,9 +28,9 @@ D_n_1=0.001*(u.m*u.m/u.s) # Diffussion cofficient for holes
 N_A=5e+23*(u.m**-3) #Charge density for holes 
 N_D=2e+24*(u.m**-3) #Charge density for holes
 
-ni= 2.1e12*(u.m**-3)
 
-
+# two of the three normalizing constants 
+ni= 2.1e12*(u.m**-3) #internsinic charge density 
 Vt= k_b*T/q # Thermal Voltage to be used for potential normilzation 
 
 
@@ -41,28 +41,35 @@ Vt= k_b*T/q # Thermal Voltage to be used for potential normilzation
 # If N_A < N_D then n= N_D-N_A. That is the semiconducotr material is n-type and  n=ni^2/p
 # If undoped n=p=ni, where ni is the electron and hole concentration when undoped
 
-#Build up potential, deplation width, Debye leng
+#Build up potential, 
  
 Vbi = k_b*T*log((N_A*N_D)/(ni*ni))# Barrier potential, an intially established potential difference due to the electric field formed 
 VbiT= log((N_A*N_D)/(ni*ni)) # after normalization of Vbi with Vt
+
+#deplation width
 xno=(sqrt(2*epsGS*N_A*Vbi*u.m**-2/((q*q)*N_D*(N_A+N_D))))*u.m   #deplation widith for n in cm
 xpo=(sqrt(2*epsGS*N_D*Vbi*u.m**-2/((q*q)*N_A*(N_A+N_D))))*u.m   #deplation widith for p in cm
 W=sqrt(2*epsGS*Vbi*(N_A+N_D)*u.m**-2/((q*q)*N_D*N_A))*u.m       # W=xno+xpo  in cm
+
+#Debye length to be used for normalizing mesh size 
 Ldn=sqrt(epsGS*k_b*T*u.m**-2/(q*q*N_D))*u.m                     #Deybe length for donors
 Ldp=sqrt(epsGS*k_b*T*u.m**-2/(q*q*N_A))*u.m                    #Deybe length for acceptors
 Ldi=sqrt(epsGS*Vt*u.m**-2/(q*ni))*u.m                          #Deybe length for internsinic carrier concentration (which means when it is undoped)
-WL=sqrt(2*VbiT*ni*((1/N_D)+(1/N_A)))    # after normalization of W with Ldi
 
-# if Vt is used it is just q if KbT is used it is q^2
+#Normalized width of deplation 
+WL=W/Ldi                                                     # after normalization of W with Ldi
+
+
+
 #outside -xpo<x<0 it is p region and 0<xno is the n region. Outside this region the is netural due to diffusion 
  
 x=WL #Since meshe length is limited by Debye length; it should be normalized 
 N= 20
 dx = x/(N-1);
-h=dx
+h=dx # mesh size 
 h2=dx*dx 
 
-C=np.zeros(N)
+C=np.zeros(N) # Doping concentration is different for p and  n region
 for i in range (1,N):
     if i<= 10:
         C[i] = - N_A/ni
@@ -76,9 +83,10 @@ n=np.zeros(N)
 p=np.zeros(N)
 
 #charges are normlized by ni
-n[0]=(ni)/(N_A)
+#Boundary conditions obtained from notes by Dr.Guofu Niu Auburn 
+n[0]=(ni)/(N_A) # ni**2/N_A before normalizaition 
 p[0]=N_A*u.m**3
-p[N-1]=(ni)/(N_D)
+p[N-1]=(ni)/(N_D) # ni**2/N_D before normalizaition 
 n[N-1]=N_D*u.m**3
 Vo[0]=0
 Vo[N-1]=VbiT
@@ -86,6 +94,8 @@ Vo[N-1]=VbiT
 
 
 #Finding the solution
+
+#intialzing arrays 
 bt=np.zeros(N)
 alpha=np.zeros(N)
 a=np.zeros(N)
@@ -102,10 +112,9 @@ c[N-1] = 0
 b[N-1] = 1
 f[N-1] = Vo[N-1]
 
-print Vo
-print Vbi
 
-Tol=1e-5
+
+Tol=1e-4
 
 
 a=a+1/h2
@@ -163,10 +172,10 @@ while not taw==1:
     delta[N-1] = last- Vo[N-1] # differnce between
        
    
-    for i in range (N-2,1,1):
+    for i in range (N-2,1,-1):
         last=(g[i]-c[i]*Vo[i+1])/alpha[i]
         delta[i]=last-Vo[i]
-        Vo[i]=las
+        Vo[i]=last
    
     
    
@@ -193,7 +202,47 @@ while not taw==1:
         f=-np.exp(Vo)+np.exp(-Vo)-(np.exp(Vo)-np.exp(-Vo))*Vo + C
     
              
-print Vo   
+print Vo
+nf=np.zeros(N) 
+pf=np.zeros(N)
+    
+for i in range (1,N-1):
+    n = np.exp(Vo)
+    p = np.exp(-Vo)
+   
+nf = n*ni
+pf = p*ni
+
+
+print nf
+print pf
+
+y=np.zeros(N)
+xn=xno/Ldi
+xp=xpo/Ldi
+
+y[0]=-xn
+
+
+for i in range (1,N-1):
+    y[i]=y[i-1]+h
+    y[N-1]=xp
+    
+print y    
+
+plt.plot(y,nf)
+ 
+plt.draw()
+
+
+
+
+
+        
+
+
+
+
 
 
 
